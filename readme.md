@@ -1,5 +1,6 @@
 # Proteomic analyses of incident cardiac diseases in the UKB-PPP
-This repository provides the code used for the main analyses reported by Schuermans, Pournamdari, et al. 
+This repository provides the code used to characterize the circulating proteome associated with incident cardiac diseases in the UK Biobank Pharma Proteomics Project (UKB-PPP). The methods and results associated with the scripts in this repository can be found at:
+"citation"
 
 ## Scripts
 * Participant and protein exclusion / data imputation: [script](https://github.com/ArtSchuermans/ukbppp_cardiac_diseases/blob/main/1_exclusion_imputation.R)
