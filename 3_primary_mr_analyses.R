@@ -8,7 +8,8 @@
  library(genetics.binaRies)
  library(MendelianRandomization)
  
- synLogin() # This is to log in to the Synapse platform, you need your own login data
+ setwd("/broad/hptmp/aschuerm/synapser")
+  synLogin(email='XXX', authToken="XXX") # This is to log in to the Synapse platform, needed to gain access to the protein sum stats
 
  sumstats_info <- fread(".../ukb_proteomics_cvd/input_files/2_olink_protein_map_mr.txt")
  primary_findings <- fread(".../ukb_proteomics_cvd/output_files/1_adj_no_prev_timevar_model_hr.csv")
@@ -74,6 +75,7 @@
      outcome_rsid <- outcome_rsid %>% mutate(rsids = strsplit(as.character(rsids), ",")) %>% unnest(rsids)
      outcome_overlap$phen <- paste(outcome_get)
      outcome_overlap$id <- paste(outcome_overlap$`#chrom`, outcome_overlap$pos, outcome_overlap$alt, outcome_overlap$ref, sep=":")
+     outcome_overlap <- as.data.frame(outcome_overlap)
      outcome_overlap <- format_data(outcome_overlap, type="outcome", phenotype_col="phen", snp_col="id", beta_col="beta", se_col="sebeta", eaf_col="af_alt",
                                 effect_allele_col="alt", other_allele_col="ref", pval_col="pval", chr_col="#chrom", pos_col="pos")
      
@@ -85,6 +87,7 @@
      chrom_overlap <- rbind(chrom_overlap, chrom_overlap_2)
      chrom_overlap$ID <- paste(chrom_overlap$CHROM, chrom_overlap$GENPOS, chrom_overlap$ALLELE1, chrom_overlap$ALLELE0, sep=":")
      chrom_overlap$phen <- sumstats_info[sumstats_info$Code==i,]$Assay[1]
+     chrom_overlap <- as.data.frame(chrom_overlap)
      chrom_overlap <- format_data(chrom_overlap, type="exposure", phenotype_col="phen", snp_col="ID", beta_col="BETA", se_col="SE", eaf_col="A1FREQ",
                                 effect_allele_col="ALLELE1", other_allele_col="ALLELE0", pval_col="LOG10P", chr_col="CHROM", samplesize_col="N", pos_col="GENPOS", log_pval=T)
      rm(chrom_overlap_2, chrom)
@@ -123,10 +126,18 @@
                            se=results_mr$se, pval=results_mr$pval)
       } else if (nrow(dat)==2) { 
        ld <- ld_matrix(dat$SNP, bfile=".../tools/g1000_eur", plink_bin=genetics.binaRies::get_plink_binary())
-       dat$marker_ld <- paste(dat$SNP, dat$effect_allele.exposure, dat$other_allele.exposure, sep="_")
-       dat <- dat[order(dat$marker_ld), ]
-       ld <- ld[order(rownames(ld)), order(colnames(ld))]
-       dat2 <- MendelianRandomization::mr_input(bx = dat$beta.exposure, bxse = dat$se.exposure,
+       rownames(ld) <- gsub("\\_.*", "", rownames(ld))
+       dat_dupl <- dat[!(paste(dat$SNP, dat$effect_allele.exposure, dat$other_allele.exposure, sep="_") %in% colnames(ld)),]
+        colnames(dat_dupl)[which(colnames(dat_dupl) %in% c("effect_allele.exposure", "other_allele.exposure", "effect_allele.outcome", "other_allele.outcome"))] <- c("other_allele.exposure", "effect_allele.exposure", "other_allele.outcome", "effect_allele.outcome")
+        dat_dupl$beta.exposure <- dat_dupl$beta.exposure*-1
+        dat_dupl$beta.outcome <- dat_dupl$beta.outcome*-1
+        dat_dupl$eaf.exposure <- 1-dat_dupl$eaf.exposure
+        dat_dupl$eaf.outcome <- 1-dat_dupl$eaf.outcome
+        dat <- dat[(paste(dat$SNP, dat$effect_allele.exposure, dat$other_allele.exposure, sep="_") %in% colnames(ld)),]
+        dat <- rbind(dat, dat_dupl)
+        dat <- dat[ order(match(dat$SNP, rownames(ld))), ]
+        dat$marker_ld <- paste(dat$SNP, dat$effect_allele.exposure, dat$other_allele.exposure, sep="_")
+        dat2 <- MendelianRandomization::mr_input(bx = dat$beta.exposure, bxse = dat$se.exposure,
                                                  by = dat$beta.outcome, byse = dat$se.outcome,
                                                  correlation = ld)
        output_mr_ivw_corr <- MendelianRandomization::mr_ivw(dat2, correl = TRUE)
@@ -136,9 +147,17 @@
                              se=output_mr_ivw_corr@StdError, pval=output_mr_ivw_corr@Pvalue)
       } else {
        ld <- ld_matrix(dat$SNP, bfile=".../tools/g1000_eur", plink_bin=genetics.binaRies::get_plink_binary())
-       dat$marker_ld <- paste(dat$SNP, dat$effect_allele.exposure, dat$other_allele.exposure, sep="_")
-       dat <- dat[order(dat$marker_ld), ]
-       ld <- ld[order(rownames(ld)), order(colnames(ld))]
+       rownames(ld) <- gsub("\\_.*", "", rownames(ld))
+       dat_dupl <- dat[!(paste(dat$SNP, dat$effect_allele.exposure, dat$other_allele.exposure, sep="_") %in% colnames(ld)),]
+        colnames(dat_dupl)[which(colnames(dat_dupl) %in% c("effect_allele.exposure", "other_allele.exposure", "effect_allele.outcome", "other_allele.outcome"))] <- c("other_allele.exposure", "effect_allele.exposure", "other_allele.outcome", "effect_allele.outcome")
+        dat_dupl$beta.exposure <- dat_dupl$beta.exposure*-1
+        dat_dupl$beta.outcome <- dat_dupl$beta.outcome*-1
+        dat_dupl$eaf.exposure <- 1-dat_dupl$eaf.exposure
+        dat_dupl$eaf.outcome <- 1-dat_dupl$eaf.outcome
+        dat <- dat[(paste(dat$SNP, dat$effect_allele.exposure, dat$other_allele.exposure, sep="_") %in% colnames(ld)),]
+        dat <- rbind(dat, dat_dupl)
+        dat <- dat[ order(match(dat$SNP, rownames(ld))), ]
+        dat$marker_ld <- paste(dat$SNP, dat$effect_allele.exposure, dat$other_allele.exposure, sep="_")
        dat2 <- MendelianRandomization::mr_input(bx = dat$beta.exposure, bxse = dat$se.exposure,
                                                  by = dat$beta.outcome, byse = dat$se.outcome,
                                                  correlation = ld)
@@ -181,5 +200,3 @@
    print(paste(sumstats_info[sumstats_info$Code==i,]$Assay[1], "done"))
    unlink(paste0(gsub("\\\\[^\\\\]*$", "", syn_code$cacheDir)), recursive=T)
 }
- 
- 
